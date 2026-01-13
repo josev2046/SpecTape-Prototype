@@ -45,11 +45,11 @@
             justify-content: center;
             align-items: center;
             background: var(--sp-white); /* Default to Grey (Paper color) */
-            padding: 40px; 
+            /* Thicker, responsive framing to match the video style */
+            padding: 10vmin; 
             transition: background 0s;
             position: relative;
             overflow: hidden;
-            /* Ensure background repeats for the animation */
             background-repeat: repeat;
         }
 
@@ -84,7 +84,7 @@
             position: absolute;
             top: 10px; left: 10px;
             color: #000;
-            font-family: 'VT323', monospace; /* Retro font */
+            font-family: 'VT323', monospace; 
             font-size: 20px;
             line-height: 1.1;
             font-weight: bold;
@@ -95,7 +95,6 @@
             pointer-events: none;
         }
 
-        /* Class to move text to bottom for status messages */
         #os-text.bottom-prompt {
             top: auto !important;
             bottom: 0px;
@@ -201,8 +200,7 @@
         }
 
         /* --- ANIMATED RASTER STRIPES --- */
-        /* We removed !important and fix the conflict in JS instead */
-
+        
         /* 1. Pilot Tone: Cyan and Red Stripes */
         #viewport.pilot-border { 
             background-image: repeating-linear-gradient(
@@ -212,7 +210,6 @@
                 var(--sp-red) 15px,
                 var(--sp-red) 30px
             );
-            /* Fast, harsh jitter using steps() to mimic analog instability */
             animation: jitter 0.08s infinite steps(2);
         }
         
@@ -225,17 +222,14 @@
                 var(--sp-yellow) 15px,
                 var(--sp-yellow) 30px
             );
-            /* Even faster jitter for data segments */
             animation: jitter 0.04s infinite steps(2);
         }
 
-        /* Jumps the background position up and down rapidly */
         @keyframes jitter {
             0% { background-position: 0 0; }
             100% { background-position: 0 15px; }
         }
 
-        /* --- HIDDEN ENGINE ROOM --- */
         #hidden-engine { display: none; }
     </style>
 </head>
@@ -276,7 +270,6 @@
     </div>
 
     <script>
-        // --- 0. UTILS ---
         function getCssColor(varName) {
             return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
         }
@@ -326,7 +319,6 @@
         const visibleCtx = visibleCanvas.getContext('2d');
 
         let attrData = new Array(768).fill(56); 
-        
         const PALETTE = ['#000000', '#0000D7', '#D70000', '#D700D7', '#00D700', '#00D7D7', '#D7D700', '#e0e0e0'];
 
         function autoConvertImage() {
@@ -425,7 +417,7 @@
         function startLoadingSequence() {
             const greyColor = getCssColor('--sp-white');
             
-            // Clear previous states
+            // 1. Reset everything
             viewPort.style.background = '';
             viewPort.className = '';
             
@@ -437,32 +429,34 @@
             osText.style.display = 'block'; 
             osText.innerText = "";
             
-            // Cyan Leader ("Framing color")
+            // 2. FRAMING: Start with Solid Cyan Border (Leader Tone visual)
+            // This holds for 2 seconds to match the "Dean" video pacing
             viewPort.style.backgroundColor = PALETTE[5]; 
+            osText.innerText = "Program: loader";
 
-            // Phase 1: Pilot Tone (Red/Cyan Stripes)
+            // 3. START PILOT (Red/Cyan Stripes) after 2 seconds
             setTimeout(() => {
                 playTone('pilot');
-                // FIX: Clear the inline cyan color so the striped class takes over and animates
-                viewPort.style.background = ''; 
-                viewPort.className = 'pilot-border';
-                osText.innerText = "Program: loader";
-            }, 600);
+                viewPort.style.backgroundColor = ''; // Clear solid color
+                viewPort.className = 'pilot-border'; // Start jitter stripes
+            }, 2000);
 
+            // 4. HEADER INFO PAUSE after 4 more seconds
             setTimeout(() => {
-                // Phase 2: Data Header
                 osText.innerText += "\nBytes: art";
+                stopTone(); // Silence briefly
+                viewPort.className = ''; // Stop stripes
+                viewPort.style.backgroundColor = greyColor; // Grey border gap
                 
+                // 5. START DATA LOAD (Blue/Yellow Stripes)
                 setTimeout(() => {
-                    // Switch to Data Stripes
-                    // FIX: Clear inline style again just to be safe
-                    viewPort.style.background = '';
+                    viewPort.style.backgroundColor = '';
                     viewPort.className = 'data-border'; 
                     osText.style.display = 'none'; 
                     playTone('data');
                     startBitmapLoad();
-                }, 1000);
-            }, 2100);
+                }, 1000); // 1 second silence gap
+            }, 6000);
         }
 
         function startBitmapLoad() {
@@ -500,10 +494,11 @@
         function finishLoading() {
             stopTone();
             viewPort.className = '';
-            // Solid Black finish
-            viewPort.style.background = '#000';
             
+            // RETURN TO GREY (not Black) to match the "0 OK" state
             const greyColor = getCssColor('--sp-white');
+            viewPort.style.backgroundColor = greyColor;
+            
             visibleCtx.fillStyle = greyColor;
             visibleCtx.fillRect(0, 192 - 24, 256, 24);
 
