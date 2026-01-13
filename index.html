@@ -19,8 +19,8 @@
             --sp-green: #00D700;
             --sp-cyan: #00D7D7;
             --sp-yellow: #D7D700;
-            --sp-white: #FFFFFF;
-            --sp-grey: #e0e0e0; /* The classic "TV White" background */
+            /* THE FIX: We make the JS match this variable below */
+            --sp-grey: #e0e0e0; 
             
             --case-black: #1a1a1a;
             --key-grey: #2d2d2d;
@@ -98,12 +98,12 @@
             top: auto !important;
             bottom: 0px;
             left: 0px;
-            /* THE FIX: Transparent background here, letting the canvas color show through */
+            /* Transparent so we see the canvas color underneath */
             background-color: transparent;
             width: 100%;
             padding: 4px 10px;
             box-sizing: border-box;
-            text-shadow: none; /* Clean text for the system prompt */
+            text-shadow: none; 
         }
 
         /* --- CHASSIS & CONTROLS --- */
@@ -310,14 +310,17 @@
         const visibleCtx = visibleCanvas.getContext('2d');
 
         let attrData = new Array(768).fill(56); 
-        const PALETTE = ['#000000', '#0000D7', '#D70000', '#D700D7', '#00D700', '#00D7D7', '#D7D700', '#FFFFFF'];
+        
+        // FIX 1: Set the last color (White) to exactly #e0e0e0 to match CSS
+        const PALETTE = ['#000000', '#0000D7', '#D70000', '#D700D7', '#00D700', '#00D7D7', '#D7D700', '#e0e0e0'];
 
         function autoConvertImage() {
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = 256; tempCanvas.height = 192;
             const tCtx = tempCanvas.getContext('2d');
             
-            tCtx.fillStyle = "white";
+            // FIX 2: Use palette white (#e0e0e0) instead of "white" (#FFFFFF)
+            tCtx.fillStyle = PALETTE[7];
             tCtx.fillRect(0, 0, 256, 192);
             
             const w = refImg.naturalWidth, h = refImg.naturalHeight;
@@ -340,7 +343,8 @@
             
             redrawAttributes();
 
-            compCtx.fillStyle = "white"; 
+            // FIX 3: Ensure composite background is also #e0e0e0
+            compCtx.fillStyle = PALETTE[7]; 
             compCtx.fillRect(0,0,256,192); 
             
             compCtx.globalAlpha = 1.0;
@@ -373,7 +377,10 @@
 
         function getNearestSpeccyColor(r, g, b) {
             let minDist = Infinity, bestIndex = 0;
-            const specRGB = [[0,0,0],[0,0,215],[215,0,0],[215,0,215],[0,215,0],[0,215,215],[215,215,0],[255,255,255]];
+            
+            // Note: We compare against standard RGB values, but map to our PALETTE
+            const specRGB = [[0,0,0],[0,0,215],[215,0,0],[215,0,215],[0,215,0],[0,215,215],[215,215,0],[224,224,224]]; // slightly tweaked white for calc
+            
             specRGB.forEach((rgb, i) => {
                 const d = Math.sqrt((r-rgb[0])**2 + (g-rgb[1])**2 + (b-rgb[2])**2);
                 if (d < minDist) { minDist = d; bestIndex = i; }
@@ -385,10 +392,15 @@
             attrCtx.clearRect(0, 0, 256, 192); 
             for (let i = 0; i < 768; i++) { 
                 const paper = (attrData[i] >> 3) & 7; 
+                // Only draw if NOT default white, or if white, use our special grey
                 if (paper !== 7) { 
                     attrCtx.fillStyle = PALETTE[paper]; 
                     attrCtx.fillRect((i % 32) * 8, Math.floor(i / 32) * 8, 8, 8); 
-                } 
+                } else {
+                    // Force the paper color to our specific grey
+                    attrCtx.fillStyle = PALETTE[7];
+                    attrCtx.fillRect((i % 32) * 8, Math.floor(i / 32) * 8, 8, 8);
+                }
             }
         }
 
@@ -410,14 +422,13 @@
         }
 
         function startLoadingSequence() {
-            // Get color from CSS variable for consistency
             const greyColor = getCssColor('--sp-grey');
             
             // Reset Screen
             visibleCtx.fillStyle = greyColor; 
             visibleCtx.fillRect(0,0,256,192);
             
-            // Reset Text Position to TOP LEFT for loading
+            // Reset Text Position
             osText.classList.remove('bottom-prompt');
             osText.style.display = 'block'; 
             osText.innerText = "";
@@ -449,7 +460,6 @@
                     finishLoading();
                     return;
                 }
-                // Copy from the COMPOSITE canvas
                 visibleCtx.drawImage(compositeCanvas, 0, y, 256, step, 0, y, 256, step);
                 y += step;
                 if(osc && Math.random() > 0.8) {
@@ -463,18 +473,12 @@
             viewPort.className = '';
             viewPort.style.background = '#000';
             
-            // --- THE FIX ---
-            // 1. Get the exact grey from CSS.
             const greyColor = getCssColor('--sp-grey');
             
-            // 2. Paint the bottom strip of the CANVAS directly. 
-            // This ensures the grey pixels are on the canvas layer, 
-            // matching the rest of the image rendering exactly.
-            // 24px height on 256x192 canvas roughly equals the visual height of the text area.
+            // Paint bottom area manually with the exact CSS grey
             visibleCtx.fillStyle = greyColor;
             visibleCtx.fillRect(0, 192 - 24, 256, 24);
 
-            // 3. Show the text (which now has transparent background in CSS)
             osText.innerText = "0 OK, 10:1";
             osText.classList.add('bottom-prompt');
             osText.style.display = 'block';
@@ -483,7 +487,7 @@
         function saveImage() {
             const link = document.createElement('a');
             link.download = 'zx-art.png';
-            link.href = compositeCanvas.toDataURL(); // Save the flattened result
+            link.href = compositeCanvas.toDataURL(); 
             link.click();
         }
     </script>
