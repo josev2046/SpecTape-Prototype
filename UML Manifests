@@ -1,0 +1,89 @@
+@startuml
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam maxMessageSize 250
+skinparam ParticipantPadding 20
+
+actor "User" as User
+boundary "SwiftUI View" as UI
+control "Swift Logic\n(ViewController)" as Swift
+entity "Hidden\nWKWebView" as Bridge
+collections "JS Engine\n(Logic & Pixels.js)" as JS
+
+== 1. Initialization ==
+User -> UI: Open App
+activate UI
+UI -> Swift: Initialize
+activate Swift
+Swift -> Bridge: Load "index.html"
+activate Bridge
+Bridge -> JS: Load Scripts (Pixels.js, Engine)
+activate JS
+JS --> Bridge: Ready
+deactivate JS
+Bridge --> Swift: Web Content Loaded
+deactivate Bridge
+Swift --> UI: Show "Insert Tape" Screen
+deactivate Swift
+
+== 2. Image Loading & Tape Simulation ==
+User -> UI: Tap "Photo" Button
+UI -> Swift: Request Image Picker
+Swift -> User: Open Native Gallery/Camera
+User -> Swift: Select Image
+activate Swift
+
+note right of Swift
+  **Preprocessing:**
+  Convert UIImage to Base64 String
+end note
+
+Swift -> Swift: Start Tape Experience\n(Play Sound, Flash Border, Haptics)
+Swift -> Bridge: evaluateJavaScript\n("loadBase64Image(base64Data)")
+activate Bridge
+
+Bridge -> JS: Trigger autoConvertImage()
+activate JS
+
+note right of JS
+  **Logic Reuse:**
+  1. Draw Image to Canvas
+  2. Apply Pixels.js Filter
+  3. Calculate Spectrum Attributes
+  4. Draw Pixel Art
+end note
+
+JS -> JS: Process Image (CPU Work)
+JS -> Bridge: window.webkit.messageHandlers\n.appBridge.postMessage("conversionComplete")
+deactivate JS
+deactivate Bridge
+
+Swift <- Bridge: Receive "conversionComplete"
+Swift -> UI: Reveal Image (Simulate line-by-line loading)
+Swift -> Swift: Stop Audio & Haptics
+deactivate Swift
+
+== 3. Exporting TZX ==
+User -> UI: Tap "Save TZX"
+activate UI
+UI -> Swift: Handle Save Request
+activate Swift
+Swift -> Bridge: evaluateJavaScript\n("exportTZXForSwift()")
+activate Bridge
+
+Bridge -> JS: Execute TZX Generation
+activate JS
+JS -> JS: Generate Binary Data (Uint8Array)
+JS -> JS: Convert Binary to Base64
+JS -> Bridge: postMessage({type: "saveTZX", data: "..."})
+deactivate JS
+deactivate Bridge
+
+Swift <- Bridge: Receive Base64 Data
+Swift -> Swift: Decode Base64 to Data object
+Swift -> Swift: Write to temp file (image.tzx)
+Swift -> User: Open iOS Share Sheet
+deactivate Swift
+deactivate UI
+
+@enduml
