@@ -20,6 +20,7 @@
             --sp-cyan: #00D7D7;
             --sp-yellow: #D7D700;
             --sp-white: #FFFFFF;
+            --sp-grey: #e0e0e0; /* The classic "TV White" background */
             
             --case-black: #1a1a1a;
             --key-grey: #2d2d2d;
@@ -65,7 +66,7 @@
         #stage {
             position: relative;
             width: 320px; height: 240px; /* 4:3 Aspect Ratio */
-            background: #e0e0e0;
+            background: var(--sp-grey);
             box-shadow: 0 0 30px rgba(0,0,0,0.9);
             image-rendering: pixelated;
             border: 1px solid #333;
@@ -95,8 +96,14 @@
         /* Class to move text to bottom for status messages */
         #os-text.bottom-prompt {
             top: auto !important;
-            bottom: 6px;
-            left: 6px;
+            bottom: 0px;
+            left: 0px;
+            /* THE FIX: Solid grey background for the status line */
+            background-color: var(--sp-grey);
+            width: 100%;
+            padding: 4px 10px;
+            box-sizing: border-box;
+            text-shadow: none; /* Clean text for the system prompt */
         }
 
         /* --- CHASSIS & CONTROLS --- */
@@ -447,7 +454,7 @@
             viewPort.className = '';
             viewPort.style.background = '#000';
             
-            // Show the success message at the bottom
+            // Show the success message at the bottom with GREY background
             osText.innerText = "0 OK, 10:1";
             osText.classList.add('bottom-prompt');
             osText.style.display = 'block';
