@@ -37,3 +37,11 @@ The final version of this application will be rewritten in **Swift** and **Metal
 * **Haptic integration:** Using CoreHaptics to vibrate the phone in sync with the "data crunching" audio.
 * **Social export:** Generating `.gif` or `.mp4` video of the loading sequence to share on social media.
 
+## Privacy & Data Governance
+
+This prototype adheres to a strict **"local-first"** architecture. 
+
+* **Zero data collection:** No images, metadata, or user inputs are transmitted to external servers.
+* **On-device processing:** All image manipulation (scaling, filtering, Spectrum conversion) occurs locally within the device's web browser using the HTML5 Canvas API.
+* **Data retention:** User data exists solely in the device's temporary memory (RAM) and is irretrievably cleared the moment the application is closed or refreshed.
+
