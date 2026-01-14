@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>JV's SpecTape</title>
+    <title>JV's SpecTape + Video Rec</title>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
@@ -44,8 +44,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background: var(--sp-white); /* Default to Grey (Paper color) */
-            /* Thicker, responsive framing to match the video style */
+            background: var(--sp-white);
             padding: 10vmin; 
             transition: background 0s;
             position: relative;
@@ -180,6 +179,38 @@
             width: 100px;
         }
 
+        /* --- RECORD KEY STYLING --- */
+        .rubber-key.rec-key {
+            background: #a00; /* Dark Red */
+        }
+        .rubber-key.rec-key:active {
+            background: #800;
+        }
+        
+        /* STATE: RECORDING (Pulsing Red) */
+        .rubber-key.rec-key.recording {
+            background: #f00; 
+            box-shadow: 0 0 10px #f00, 0 6px 0 #300;
+            animation: pulse 1s infinite;
+        }
+
+        /* STATE: TAPE READY (Pulsing Green) */
+        .rubber-key.rec-key.tape-ready {
+            background: #00aa00; 
+            box-shadow: 0 0 10px #0f0, 0 6px 0 #030;
+            animation: pulse 2s infinite;
+        }
+        
+        /* Command Text Color Adjustments */
+        .rubber-key.rec-key span.cmd { color: #ffcccc; }
+        .rubber-key.rec-key.tape-ready span.cmd { color: #ccffcc; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
         .rubber-key span.cmd {
             color: var(--sp-red);
             font-size: 11px;
@@ -259,6 +290,11 @@
                 <span class="cmd">SAVE</span>
                 <span class="label">S</span>
             </div>
+
+            <div class="rubber-key rec-key" onclick="toggleVideoRecord()">
+                <span class="cmd">VIDEO</span>
+                <span class="label">R</span>
+            </div>
         </div>
     </div>
 
@@ -267,6 +303,7 @@
         <canvas id="speccyCanvas" width="256" height="192"></canvas>
         <canvas id="attrCanvas" width="256" height="192"></canvas>
         <canvas id="compositeCanvas" width="256" height="192"></canvas>
+        <canvas id="masterTapeCanvas" width="320" height="240"></canvas>
     </div>
 
     <script>
@@ -278,13 +315,22 @@
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let osc = null, gain = null;
 
+        // Create a MediaStreamDestination to capture audio for the video recorder
+        const audioDest = audioCtx.createMediaStreamDestination();
+
         function playTone(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             if (osc) stopTone();
             osc = audioCtx.createOscillator();
             gain = audioCtx.createGain();
+            
             osc.connect(gain);
+            
+            // Connect to Speakers
             gain.connect(audioCtx.destination);
+            // Connect to Recorder
+            gain.connect(audioDest);
+
             osc.type = 'square';
             gain.gain.value = 0.1; 
 
@@ -307,7 +353,159 @@
             }
         }
 
-        // --- 2. CONVERSION ENGINE ---
+        // --- 2. VIDEO RECORDER ENGINE ---
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        let videoUrl = null;
+        let animationFrameId;
+        
+        const masterCanvas = document.getElementById('masterTapeCanvas');
+        const masterCtx = masterCanvas.getContext('2d');
+
+        function toggleVideoRecord() {
+            const btn = document.querySelector('.rec-key');
+            const cmdSpan = btn.querySelector('.cmd');
+
+            // STATE 3: TAPE READY (User clicks Green button to Download)
+            if (btn.classList.contains('tape-ready')) {
+                downloadTape();
+                // Reset to Idle
+                btn.classList.remove('tape-ready');
+                cmdSpan.innerText = "VIDEO";
+                if(videoUrl) URL.revokeObjectURL(videoUrl);
+                videoUrl = null;
+                osText.innerText = "TAPE EJECTED";
+                setTimeout(() => { osText.style.display = 'none'; }, 2000);
+                return;
+            }
+
+            // STATE 2: STOP RECORDING (User clicks Flashing Red button)
+            if (isRecording) {
+                if(mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+                isRecording = false;
+                btn.classList.remove('recording');
+                cancelAnimationFrame(animationFrameId);
+                return;
+            }
+
+            // STATE 1: START RECORDING (User clicks Red button)
+            btn.classList.add('recording');
+            isRecording = true;
+            
+            // Visual feedback
+            const oldText = osText.innerText;
+            osText.style.display = 'block';
+            osText.innerText = "REC ARMED";
+            osText.classList.add('bottom-prompt');
+            setTimeout(() => { 
+                osText.innerText = oldText; 
+                if(oldText === "") osText.style.display = 'none';
+                osText.classList.remove('bottom-prompt');
+            }, 1000);
+
+            startInternalRecording();
+        }
+
+        function startInternalRecording() {
+            // Only start if user actually armed the tape
+            if (!isRecording) return;
+
+            recordedChunks = [];
+            // Capture canvas at 30FPS
+            const canvasStream = masterCanvas.captureStream(30);
+            
+            // Merge Audio + Video
+            const combinedTracks = [
+                ...canvasStream.getVideoTracks(),
+                ...audioDest.stream.getAudioTracks()
+            ];
+            const combinedStream = new MediaStream(combinedTracks);
+
+            let options = { mimeType: 'video/webm; codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/webm' };
+            }
+
+            mediaRecorder = new MediaRecorder(combinedStream, options);
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = exportVideo;
+            mediaRecorder.start();
+            
+            renderMasterTape();
+        }
+
+        // Renders the scene onto the hidden canvas for the recorder
+        function renderMasterTape() {
+            if (!isRecording) return;
+
+            // 1. Draw Border
+            const borderState = viewPort.className;
+            
+            if (borderState === 'pilot-border') {
+                drawStripes(masterCtx, ['#00D7D7', '#D70000'], 15); // Cyan/Red
+            } else if (borderState === 'data-border') {
+                drawStripes(masterCtx, ['#0000D7', '#D7D700'], 8); // Blue/Yellow
+            } else {
+                const bgColor = viewPort.style.backgroundColor || getCssColor('--sp-white');
+                masterCtx.fillStyle = bgColor;
+                masterCtx.fillRect(0,0,320,240);
+            }
+
+            // 2. Draw Screen
+            masterCtx.drawImage(visibleCanvas, 32, 24);
+
+            animationFrameId = requestAnimationFrame(renderMasterTape);
+        }
+
+        let stripeOffset = 0;
+        function drawStripes(ctx, colors, speed) {
+            stripeOffset = (stripeOffset + speed) % 30; 
+            const stripeHeight = 15;
+            
+            for (let y = -30; y < 240; y += stripeHeight) {
+                const colorIndex = Math.floor((y + stripeOffset) / stripeHeight) % 2;
+                ctx.fillStyle = colors[Math.abs(colorIndex)];
+                ctx.fillRect(0, y, 320, stripeHeight);
+            }
+        }
+
+        // Called when recording finishes
+        function exportVideo() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            videoUrl = URL.createObjectURL(blob);
+
+            // Change UI to EJECT state
+            const btn = document.querySelector('.rec-key');
+            const cmdSpan = btn.querySelector('.cmd');
+            
+            btn.classList.remove('recording');
+            btn.classList.add('tape-ready');
+            cmdSpan.innerText = "EJECT"; 
+            
+            osText.innerText = "TAPE PAUSED";
+            osText.classList.add('bottom-prompt');
+            osText.style.display = 'block';
+        }
+
+        function downloadTape() {
+            if (!videoUrl) return;
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = videoUrl;
+            a.download = 'SPECTRUM_LOAD.webm';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // --- 3. CONVERSION ENGINE ---
         const speccyCanvas = document.getElementById('speccyCanvas');
         const ctx = speccyCanvas.getContext('2d', {willReadFrequently: true});
         const attrCanvas = document.getElementById('attrCanvas');
@@ -397,7 +595,7 @@
             }
         }
 
-        // --- 3. ANIMATION LOGIC ---
+        // --- 4. ANIMATION LOGIC ---
         const viewPort = document.getElementById('viewport');
         const osText = document.getElementById('os-text');
 
@@ -415,13 +613,15 @@
         }
 
         function startLoadingSequence() {
+            // Trigger recorder if it was armed
+            if (isRecording) startInternalRecording();
+
             const greyColor = getCssColor('--sp-white');
             
             // 1. Reset everything
             viewPort.style.background = '';
             viewPort.className = '';
             
-            // Reset Screen to Grey
             visibleCtx.fillStyle = greyColor; 
             visibleCtx.fillRect(0,0,256,192);
             
@@ -429,33 +629,32 @@
             osText.style.display = 'block'; 
             osText.innerText = "";
             
-            // 2. FRAMING: Start with Solid Cyan Border (Leader Tone visual)
-            // This holds for 2 seconds to match the "Dean" video pacing
+            // 2. FRAMING
             viewPort.style.backgroundColor = PALETTE[5]; 
             osText.innerText = "Program: loader";
 
-            // 3. START PILOT (Red/Cyan Stripes) after 2 seconds
+            // 3. PILOT
             setTimeout(() => {
                 playTone('pilot');
-                viewPort.style.backgroundColor = ''; // Clear solid color
-                viewPort.className = 'pilot-border'; // Start jitter stripes
+                viewPort.style.backgroundColor = ''; 
+                viewPort.className = 'pilot-border'; 
             }, 2000);
 
-            // 4. HEADER INFO PAUSE after 4 more seconds
+            // 4. HEADER INFO
             setTimeout(() => {
                 osText.innerText += "\nBytes: art";
-                stopTone(); // Silence briefly
-                viewPort.className = ''; // Stop stripes
-                viewPort.style.backgroundColor = greyColor; // Grey border gap
+                stopTone(); 
+                viewPort.className = ''; 
+                viewPort.style.backgroundColor = greyColor; 
                 
-                // 5. START DATA LOAD (Blue/Yellow Stripes)
+                // 5. DATA LOAD
                 setTimeout(() => {
                     viewPort.style.backgroundColor = '';
                     viewPort.className = 'data-border'; 
                     osText.style.display = 'none'; 
                     playTone('data');
                     startBitmapLoad();
-                }, 1000); // 1 second silence gap
+                }, 1000); 
             }, 6000);
         }
 
@@ -495,7 +694,6 @@
             stopTone();
             viewPort.className = '';
             
-            // RETURN TO GREY (not Black) to match the "0 OK" state
             const greyColor = getCssColor('--sp-white');
             viewPort.style.backgroundColor = greyColor;
             
@@ -505,6 +703,17 @@
             osText.innerText = "0 OK, 10:1";
             osText.classList.add('bottom-prompt');
             osText.style.display = 'block';
+
+            // Pause the tape logic (Stop recorder, wait for Eject)
+            if (isRecording) {
+                setTimeout(() => {
+                    if(mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                    }
+                    isRecording = false;
+                    cancelAnimationFrame(animationFrameId);
+                }, 1500);
+            }
         }
 
         function saveImage() {
