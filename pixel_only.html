@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>JV's SpecTape Mobile (Pixel Only)</title>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            --sp-black: #000000;
+            --sp-blue: #0000D7;
+            --sp-red: #D70000;
+            --sp-magenta: #D700D7;
+            --sp-green: #00D700;
+            --sp-cyan: #00D7D7;
+            --sp-yellow: #D7D700;
+            --sp-white: #e0e0e0; 
+             
+            --case-black: #1a1a1a;
+            --key-grey: #2d2d2d;
+            --safe-area-bottom: env(safe-area-inset-bottom);
+        }
+
+        body {
+            background-color: #101010;
+            color: #ccc;
+            font-family: 'Courier New', monospace;
+            margin: 0; padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* --- THE TV SCREEN --- */
+        #viewport {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--sp-white);
+            padding: 5vmin; 
+            transition: background 0s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* CRT Scanline Effect Overlay */
+        #viewport::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 20;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        #stage {
+            position: relative;
+            width: 320px; height: 240px;
+            background: var(--sp-white);
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            image-rendering: pixelated;
+            z-index: 5;
+            max-width: 90vw;
+            height: auto;
+            aspect-ratio: 4/3;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+
+        #os-text {
+            position: absolute;
+            top: 10px; left: 10px;
+            color: #000;
+            font-family: 'VT323', monospace; 
+            font-size: 20px;
+            line-height: 1.1;
+            font-weight: bold;
+            z-index: 10;
+            display: none;
+            white-space: pre;
+            text-shadow: 1px 1px 0 rgba(255,255,255,0.5);
+            pointer-events: none;
+        }
+
+        #os-text.bottom-prompt {
+            top: auto !important;
+            bottom: 0px;
+            left: 0px;
+            background-color: transparent;
+            width: 100%;
+            padding: 4px 10px;
+            box-sizing: border-box;
+            text-shadow: none; 
+        }
+
+        /* --- CHASSIS & CONTROLS --- */
+        #faceplate {
+            background-color: var(--case-black);
+            padding: 15px;
+            padding-bottom: calc(20px + var(--safe-area-bottom));
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border-top: 2px solid #333;
+            box-shadow: inset 0 2px 5px rgba(255,255,255,0.1);
+            z-index: 30;
+        }
+
+        .sinclair-branding {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            padding-right: 10px;
+            margin-bottom: 5px;
+        }
+
+        .logo-text {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            font-size: 14px;
+            color: #888;
+            letter-spacing: 0.5px;
+            font-style: italic;
+        }
+
+        .rainbow-stripe {
+            width: 80px;
+            height: 6px;
+            background: linear-gradient(to right, 
+                var(--sp-red) 0%, var(--sp-red) 25%, 
+                var(--sp-yellow) 25%, var(--sp-yellow) 50%, 
+                var(--sp-green) 50%, var(--sp-green) 75%, 
+                var(--sp-blue) 75%, var(--sp-blue) 100%
+            );
+            transform: skewX(-20deg);
+        }
+
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px; 
+        }
+
+        .rubber-key {
+            background: var(--key-grey);
+            border: none;
+            color: #eee;
+            padding: 12px 10px;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 
+                inset 1px 1px 3px rgba(255,255,255,0.15),
+                inset -1px -1px 3px rgba(0,0,0,0.5),
+                0 6px 0 #111,
+                0 8px 5px rgba(0,0,0,0.4);
+            transition: all 0.1s ease;
+            width: 85px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .rubber-key.rec-key {
+            background: #a00;
+        }
+        .rubber-key.rec-key:active {
+            background: #800;
+        }
+        
+        .rubber-key.rec-key.recording {
+            background: #f00; 
+            box-shadow: 0 0 10px #f00, 0 6px 0 #300;
+            animation: pulse 1s infinite;
+        }
+
+        .rubber-key.rec-key.tape-ready {
+            background: #00aa00; 
+            box-shadow: 0 0 10px #0f0, 0 6px 0 #030;
+            animation: pulse 2s infinite;
+        }
+        
+        .rubber-key.rec-key span.cmd { color: #ffcccc; }
+        .rubber-key.rec-key.tape-ready span.cmd { color: #ccffcc; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        .rubber-key span.cmd {
+            color: var(--sp-red);
+            font-size: 11px;
+            margin-bottom: 2px;
+        }
+        
+        .rubber-key span.label {
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .rubber-key:active {
+            transform: translateY(6px);
+            box-shadow: 
+                inset 1px 1px 5px rgba(0,0,0,0.5), 
+                0 0 0 #111, 
+                0 0 0 rgba(0,0,0,0);
+        }
+
+        /* --- ANIMATED RASTER STRIPES --- */
+        #viewport.pilot-border { 
+            background-image: repeating-linear-gradient(
+                to bottom,
+                var(--sp-cyan),
+                var(--sp-cyan) 15px,
+                var(--sp-red) 15px,
+                var(--sp-red) 30px
+            );
+            animation: jitter 0.08s infinite steps(2);
+        }
+        
+        #viewport.data-border { 
+            background-image: repeating-linear-gradient(
+                to bottom,
+                var(--sp-blue),
+                var(--sp-blue) 15px,
+                var(--sp-yellow) 15px,
+                var(--sp-yellow) 30px
+            );
+            animation: jitter 0.04s infinite steps(2);
+        }
+
+        @keyframes jitter {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 15px; }
+        }
+
+        #hidden-engine { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="viewport">
+        <div id="stage">
+            <canvas id="visibleCanvas" width="256" height="192"></canvas>
+            <div id="os-text"></div>
+        </div>
+    </div>
+
+    <div id="faceplate">
+        <div class="sinclair-branding">
+            <span class="logo-text">JV's SpecTape</span>
+            <div class="rainbow-stripe"></div>
+        </div>
+
+        <div id="controls">
+            <label class="rubber-key">
+                <span class="cmd">LOAD ""</span>
+                <span class="label">J</span>
+                <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile(this)">
+            </label>
+
+            <div class="rubber-key" onclick="saveImage()">
+                <span class="cmd">SAVE</span>
+                <span class="label">S</span>
+            </div>
+
+            <div class="rubber-key rec-key" onclick="toggleVideoRecord()">
+                <span class="cmd">VIDEO</span>
+                <span class="label">R</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="hidden-engine">
+        <img id="refImg" crossorigin="anonymous">
+        <canvas id="speccyCanvas" width="256" height="192"></canvas>
+        <canvas id="attrCanvas" width="256" height="192"></canvas>
+        <canvas id="compositeCanvas" width="256" height="192"></canvas>
+        <canvas id="masterTapeCanvas" width="320" height="240"></canvas>
+    </div>
+
+    <script>
+        function getCssColor(varName) {
+            return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+        }
+
+        // --- 1. AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let osc = null, gain = null;
+        const audioDest = audioCtx.createMediaStreamDestination();
+
+        function unlockAudio() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playTone(type) {
+            unlockAudio();
+            if (osc) stopTone();
+            osc = audioCtx.createOscillator();
+            gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination); 
+            gain.connect(audioDest);            
+
+            osc.type = 'square';
+            gain.gain.value = 0.1; 
+
+            if (type === 'pilot') {
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime); 
+            } else if (type === 'data') {
+                osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+                const now = audioCtx.currentTime;
+                for(let i=0; i<300; i++) {
+                    osc.frequency.setValueAtTime(Math.random() > 0.5 ? 1200 : 2000, now + (i*0.01));
+                }
+            }
+            osc.start();
+        }
+
+        function stopTone() {
+            if (osc) {
+                try { osc.stop(); osc.disconnect(); } catch(e){}
+                osc = null;
+            }
+        }
+
+        // --- 2. VIDEO RECORDER ENGINE ---
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+        let videoUrl = null;
+        let animationFrameId;
+        let finalMimeType = '';
+        let finalExtension = 'webm';
+        
+        const masterCanvas = document.getElementById('masterTapeCanvas');
+        const masterCtx = masterCanvas.getContext('2d');
+
+        function toggleVideoRecord() {
+            unlockAudio();
+            
+            const btn = document.querySelector('.rec-key');
+            const cmdSpan = btn.querySelector('.cmd');
+
+            // STATE 3: EJECT (Download)
+            if (btn.classList.contains('tape-ready')) {
+                downloadTape();
+                btn.classList.remove('tape-ready');
+                cmdSpan.innerText = "VIDEO";
+                if(videoUrl) URL.revokeObjectURL(videoUrl);
+                videoUrl = null;
+                osText.innerText = "TAPE EJECTED";
+                setTimeout(() => { osText.style.display = 'none'; }, 2000);
+                return;
+            }
+
+            // STATE 2: STOP
+            if (isRecording) {
+                if(mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+                isRecording = false;
+                btn.classList.remove('recording');
+                cancelAnimationFrame(animationFrameId);
+                return;
+            }
+
+            // STATE 1: ARM
+            btn.classList.add('recording');
+            isRecording = true;
+            
+            const oldText = osText.innerText;
+            osText.style.display = 'block';
+            osText.innerText = "REC ARMED";
+            osText.classList.add('bottom-prompt');
+            setTimeout(() => { 
+                osText.innerText = oldText; 
+                if(oldText === "") osText.style.display = 'none';
+                osText.classList.remove('bottom-prompt');
+            }, 1000);
+
+            startInternalRecording();
+        }
+
+        function startInternalRecording() {
+            if (!isRecording) return;
+            recordedChunks = [];
+            
+            const canvasStream = masterCanvas.captureStream();
+            
+            const combinedTracks = [
+                ...canvasStream.getVideoTracks(),
+                ...audioDest.stream.getAudioTracks()
+            ];
+            const combinedStream = new MediaStream(combinedTracks);
+
+            const mimeTypes = [
+                "video/mp4",
+                "video/webm;codecs=vp9",
+                "video/webm;codecs=vp8",
+                "video/webm"
+            ];
+
+            let options = null;
+            for (let type of mimeTypes) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    options = { mimeType: type };
+                    finalMimeType = type;
+                    finalExtension = type.includes("mp4") ? "mp4" : "webm";
+                    console.log("Selected MIME:", type);
+                    break;
+                }
+            }
+
+            if (!options) {
+                alert("Browser doesn't support MediaRecorder!");
+                return;
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(combinedStream, options);
+            } catch (e) {
+                console.error("Recorder Error:", e);
+                mediaRecorder = new MediaRecorder(combinedStream);
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = exportVideo;
+            mediaRecorder.start();
+            
+            renderMasterTape();
+        }
+
+        function renderMasterTape() {
+            if (!isRecording) return;
+
+            const borderState = viewPort.className;
+            if (borderState === 'pilot-border') {
+                drawStripes(masterCtx, ['#00D7D7', '#D70000'], 15);
+            } else if (borderState === 'data-border') {
+                drawStripes(masterCtx, ['#0000D7', '#D7D700'], 8);
+            } else {
+                const bgColor = viewPort.style.backgroundColor || getCssColor('--sp-white');
+                masterCtx.fillStyle = bgColor;
+                masterCtx.fillRect(0,0,320,240);
+            }
+
+            masterCtx.drawImage(visibleCanvas, 32, 24);
+            animationFrameId = requestAnimationFrame(renderMasterTape);
+        }
+
+        let stripeOffset = 0;
+        function drawStripes(ctx, colors, speed) {
+            stripeOffset = (stripeOffset + speed) % 30; 
+            const stripeHeight = 15;
+            for (let y = -30; y < 240; y += stripeHeight) {
+                const colorIndex = Math.floor((y + stripeOffset) / stripeHeight) % 2;
+                ctx.fillStyle = colors[Math.abs(colorIndex)];
+                ctx.fillRect(0, y, 320, stripeHeight);
+            }
+        }
+
+        function exportVideo() {
+            const blob = new Blob(recordedChunks, { type: finalMimeType || 'video/webm' });
+            videoUrl = URL.createObjectURL(blob);
+
+            const btn = document.querySelector('.rec-key');
+            const cmdSpan = btn.querySelector('.cmd');
+            
+            btn.classList.remove('recording');
+            btn.classList.add('tape-ready');
+            cmdSpan.innerText = "EJECT"; 
+            
+            osText.innerText = "TAPE PAUSED";
+            osText.classList.add('bottom-prompt');
+            osText.style.display = 'block';
+        }
+
+        function downloadTape() {
+            if (!videoUrl) return;
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = videoUrl;
+            a.download = `SPECTRUM_LOAD.${finalExtension}`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+            }, 100);
+        }
+
+        // --- 3. CONVERSION ENGINE ---
+        const speccyCanvas = document.getElementById('speccyCanvas');
+        const ctx = speccyCanvas.getContext('2d', {willReadFrequently: true});
+        const attrCanvas = document.getElementById('attrCanvas');
+        const attrCtx = attrCanvas.getContext('2d');
+        const compositeCanvas = document.getElementById('compositeCanvas');
+        const compCtx = compositeCanvas.getContext('2d');
+        const refImg = document.getElementById('refImg');
+        const visibleCanvas = document.getElementById('visibleCanvas');
+        const visibleCtx = visibleCanvas.getContext('2d');
+
+        let attrData = new Array(768).fill(56); 
+        const PALETTE = ['#000000', '#0000D7', '#D70000', '#D700D7', '#00D700', '#00D7D7', '#D7D700', '#e0e0e0'];
+
+        function autoConvertImage() {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 256; tempCanvas.height = 192;
+            const tCtx = tempCanvas.getContext('2d');
+            
+            tCtx.fillStyle = PALETTE[7];
+            tCtx.fillRect(0, 0, 256, 192);
+            
+            const w = refImg.naturalWidth, h = refImg.naturalHeight;
+            const s = Math.min(256/w, 192/h);
+            const dx = (256-w*s)/2, dy = (192-h*s)/2;
+            tCtx.drawImage(refImg, dx, dy, w*s, h*s);
+
+            const imgDataObj = tCtx.getImageData(0, 0, 256, 192);
+            const pixels = imgDataObj.data;
+
+            ctx.clearRect(0, 0, 256, 192);
+            attrCtx.clearRect(0, 0, 256, 192); 
+            attrData.fill(56);
+
+            for (let by = 0; by < 24; by++) {
+                for (let bx = 0; bx < 32; bx++) {
+                    processBlock(bx, by, pixels);
+                }
+            }
+            redrawAttributes();
+            
+            // Still creating composite for SAVE button, but not showing it
+            compCtx.fillStyle = PALETTE[7]; 
+            compCtx.fillRect(0,0,256,192); 
+            compCtx.drawImage(attrCanvas, 0, 0);
+            compCtx.drawImage(speccyCanvas, 0, 0);
+        }
+
+        function processBlock(bx, by, pixels) {
+            let blockColors = [];
+            for (let py = 0; py < 8; py++) {
+                for (let px = 0; px < 8; px++) {
+                    const idx = (((by * 8 + py) * 256) + (bx * 8 + px)) * 4;
+                    const r = pixels[idx], g = pixels[idx+1], b = pixels[idx+2];
+                    const brightness = (r * 0.299 + g * 0.587 + b * 0.114);
+                    
+                    if (brightness < 128) {
+                        ctx.fillStyle = "black";
+                        ctx.fillRect(bx * 8 + px, by * 8 + py, 1, 1);
+                    }
+                    blockColors.push(getNearestSpeccyColor(r, g, b));
+                }
+            }
+            const counts = {};
+            blockColors.forEach(c => counts[c] = (counts[c] || 0) + 1);
+            const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+            attrData[by * 32 + bx] = (parseInt(sorted[0]) * 8);
+        }
+
+        function getNearestSpeccyColor(r, g, b) {
+            let minDist = Infinity, bestIndex = 0;
+            const specRGB = [[0,0,0],[0,0,215],[215,0,0],[215,0,215],[0,215,0],[0,215,215],[215,215,0],[224,224,224]];
+            specRGB.forEach((rgb, i) => {
+                const d = Math.sqrt((r-rgb[0])**2 + (g-rgb[1])**2 + (b-rgb[2])**2);
+                if (d < minDist) { minDist = d; bestIndex = i; }
+            });
+            return bestIndex;
+        }
+
+        function redrawAttributes() {
+            attrCtx.clearRect(0, 0, 256, 192); 
+            for (let i = 0; i < 768; i++) { 
+                const paper = (attrData[i] >> 3) & 7; 
+                attrCtx.fillStyle = PALETTE[paper === 7 ? 7 : paper];
+                attrCtx.fillRect((i % 32) * 8, Math.floor(i / 32) * 8, 8, 8); 
+            }
+        }
+
+        // --- 4. ANIMATION LOGIC ---
+        const viewPort = document.getElementById('viewport');
+        const osText = document.getElementById('os-text');
+
+        function handleFile(input) {
+            unlockAudio();
+            if(!input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                refImg.src = e.target.result;
+                refImg.onload = () => {
+                    autoConvertImage(); 
+                    startLoadingSequence();
+                };
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        function startLoadingSequence() {
+            if (isRecording) startInternalRecording();
+
+            const greyColor = getCssColor('--sp-white');
+            viewPort.style.background = '';
+            viewPort.className = '';
+            visibleCtx.fillStyle = greyColor; 
+            visibleCtx.fillRect(0,0,256,192);
+            osText.classList.remove('bottom-prompt');
+            osText.style.display = 'block'; 
+            osText.innerText = "";
+            viewPort.style.backgroundColor = PALETTE[5]; 
+            osText.innerText = "Program: loader";
+
+            setTimeout(() => {
+                playTone('pilot');
+                viewPort.style.backgroundColor = ''; 
+                viewPort.className = 'pilot-border'; 
+            }, 2000);
+
+            setTimeout(() => {
+                osText.innerText += "\nBytes: art";
+                stopTone(); 
+                viewPort.className = ''; 
+                viewPort.style.backgroundColor = greyColor; 
+                setTimeout(() => {
+                    viewPort.style.backgroundColor = '';
+                    viewPort.className = 'data-border'; 
+                    osText.style.display = 'none'; 
+                    playTone('data');
+                    startBitmapLoad();
+                }, 1000); 
+            }, 6000);
+        }
+
+        function startBitmapLoad() {
+            let y = 0;
+            const step = 2; 
+            const timer = setInterval(() => {
+                if (y >= 192) {
+                    clearInterval(timer);
+                    // MODIFICATION: Skipped Attribute Load, went straight to finish
+                    finishLoading(); 
+                    return;
+                }
+                visibleCtx.drawImage(speccyCanvas, 0, y, 256, step, 0, y, 256, step);
+                y += step;
+                if(osc && Math.random() > 0.8) {
+                    osc.frequency.setValueAtTime(Math.random()*1000 + 500, audioCtx.currentTime);
+                }
+            }, 15);
+        }
+
+        // startAttributeLoad() FUNCTION REMOVED
+
+        function finishLoading() {
+            stopTone();
+            viewPort.className = '';
+            const greyColor = getCssColor('--sp-white');
+            viewPort.style.backgroundColor = greyColor;
+            visibleCtx.fillStyle = greyColor;
+            visibleCtx.fillRect(0, 192 - 24, 256, 24);
+            osText.innerText = "0 OK, 10:1";
+            osText.classList.add('bottom-prompt');
+            osText.style.display = 'block';
+
+            if (isRecording) {
+                setTimeout(() => {
+                    if(mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        mediaRecorder.stop();
+                    }
+                    isRecording = false;
+                    cancelAnimationFrame(animationFrameId);
+                }, 1500);
+            }
+        }
+
+        function saveImage() {
+            // Note: Saving still uses compositeCanvas, so the download might be color
+            // even if the screen shows black and white pixels.
+            const link = document.createElement('a');
+            link.download = 'zx-art.png';
+            link.href = compositeCanvas.toDataURL(); 
+            link.click();
+        }
+    </script>
+</body>
+</html>
