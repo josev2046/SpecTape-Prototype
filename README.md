@@ -1,4 +1,4 @@
-# SpecTape (Prototype)
+# SpecBooth (Prototype)
 
 [![DOI](https://zenodo.org/badge/1133374325.svg)](https://doi.org/10.5281/zenodo.18230075)
 
@@ -7,9 +7,9 @@
 
 ## The vision
 
-**SpecTape** is an exploration of "slow photography" through the lens of 1980s computing nostalgia.
+**SpecBooth** is an exploration of "slow photography" through the lens of 1980s computing nostalgia.
 
-In an era of instant, high-definition photography, SpecTape forces the user to wait. It recreates the visceral, tactile, and often anxious experience of loading software from a cassette tape on a ZX Spectrum.
+In an era of instant, high-definition photography, SpecBooth forces the user to wait. It recreates the visceral, tactile, and often anxious experience of loading software from a cassette tape on a ZX Spectrum.
 
 **The core loop:**
 1.  **Capture:** The user takes a photo.
