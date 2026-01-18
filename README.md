@@ -9,7 +9,7 @@
 
 **SpecBooth™** is an exploration of "slow photography" through the lens of 1980s computing nostalgia.
 
-In an era of instant, high-definition photography, SpecBooth™ forces the user to wait. It recreates the tactile, and sometimes anxious experience of loading software from a cassette tape on a ZX Spectrum.
+In an era of instant, high-definition photography, SpecBooth™ forces the user to wait. It recreates the tactile, and sometimes anxious experience of loading software from a cassette tape on a rubber keys ZX Spectrum.
 
 **The core loop:**
 1.  **Capture:** The user takes a photo.
